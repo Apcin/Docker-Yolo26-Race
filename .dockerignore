@@ -1,0 +1,6 @@
+**/__pycache__/
+**/*.py[cod]
+.git/
+test-input/
+test-output/
+目标检测算法Docker封装说明.pdf

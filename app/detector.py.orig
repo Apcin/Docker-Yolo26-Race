@@ -1,0 +1,46 @@
+
+from __future__ import annotations
+
+import os
+from pathlib import Path
+
+
+os.environ.setdefault("YOLO_CONFIG_DIR", "/tmp/ultralytics-config")
+os.environ.setdefault("YOLO_OFFLINE", "true")
+
+from PIL import Image
+from ultralytics import YOLO
+
+from postprocess import detections_to_objects
+from preprocess import prepare_image
+
+CONTAINER_MODEL_PATH = Path("/app/models/best.pt")
+LOCAL_MODEL_PATH = Path(__file__).resolve().parent / "models" / "best.pt"
+
+
+class Detector:
+
+    def __init__(self) -> None:
+        model_path = CONTAINER_MODEL_PATH if CONTAINER_MODEL_PATH.is_file() else LOCAL_MODEL_PATH
+        if not model_path.is_file():
+            raise FileNotFoundError(f"Model weights not found: {model_path}")
+
+        self.model = YOLO(str(model_path), task="detect")
+        self.predict_options = {
+            "imgsz": 640,
+            "batch": 1,
+            "device": 0,
+            "conf": 0.6,
+            "iou": 0.65,
+            "end2end": False,
+            "max_det": 300,
+            "save": False,
+            "verbose": False,
+        }
+
+    def predict(self, image: Image.Image) -> list[dict]:
+        prepared = prepare_image(image)
+        results = self.model.predict(source=prepared, **self.predict_options)
+        if len(results) != 1:
+            raise RuntimeError(f"Expected one prediction result, received {len(results)}")
+        return detections_to_objects(results[0], prepared.size)
